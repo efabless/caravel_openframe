@@ -1267,90 +1267,47 @@ endif
 
 
 ###########################################################################
+.PHONY: pdk pdk-with-sram
+pdk-with-sram: pdk
+pdk: check-env pdk-with-volare
 
 .PHONY: pdk-with-volare
-pdk-with-volare: check-python install-volare 
+pdk-with-volare: check-env venv/manifest.txt
 	./venv/bin/volare enable ${OPEN_PDKS_COMMIT}
-
-check-python:
-ifeq ($(shell which python3),)
-$(error Please install python 3.6+)
-endif
-
-.PHONY: install-volare
-install-volare:
-	rm -rf ./venv
-	$(PYTHON_BIN) -m venv ./venv
-	./venv/bin/$(PYTHON_BIN) -m pip install --upgrade --no-cache-dir pip
-	./venv/bin/$(PYTHON_BIN) -m pip install --upgrade --no-cache-dir volare
-
-
-###########################################################################
-pdk-with-sram: pdk
-.PHONY: pdk
-pdk: check-env skywater-pdk open-pdks sky130 gen-sources
 
 .PHONY: clean-pdk
 clean-pdk:
 	rm -rf $(PDK_ROOT)
 
-.PHONY: skywater-pdk
-skywater-pdk:
-	if [ -d "$(PDK_ROOT)/skywater-pdk" ]; then\
-		echo "Deleting existing $(PDK_ROOT)/skywater-pdk" && \
-		rm -rf $(PDK_ROOT)/skywater-pdk && sleep 2;\
-	fi
-	git clone https://github.com/google/skywater-pdk.git $(PDK_ROOT)/skywater-pdk
-	cd $(PDK_ROOT)/skywater-pdk && \
-		git checkout main && git pull && \
-		git checkout -qf $(SKYWATER_COMMIT) && \
-		git submodule update --init libraries/$(STD_CELL_LIBRARY)/latest && \
-		git submodule update --init libraries/$(IO_LIBRARY)/latest && \
-		git submodule update --init libraries/$(SPECIAL_VOLTAGE_LIBRARY)/latest && \
-		git submodule update --init libraries/$(PRIMITIVES_LIBRARY)/latest && \
-		$(MAKE) timing
+# Make README.rst
+README.rst: README.src.rst docs/source/getting-started.rst docs/source/tool-versioning.rst openlane/README.src.rst docs/source/caravel-with-openlane.rst Makefile ./venv/manifest.txt
+	rm -f README.rst && \
+		./venv/bin/rst_include include README.src.rst - | \
+			sed \
+				-e's@\.\/\_static@\/docs\/source\/\_static@g' \
+				-e's@:doc:`tool-versioning`@`tool-versioning.rst <./docs/source/tool-versioning.rst>`__@g' \
+				-e's@.. note::@**NOTE:**@g' \
+				-e's@.. warning::@**WARNING:**@g' \
+				> README.rst && \
+		./venv/bin/rst_include include openlane/README.src.rst - | \
+			sed \
+				-e's@https://github.com/efabless/caravel/blob/master/verilog@../verilog@g' \
+				-e's@:ref:`getting-started`@`README.rst <../README.rst>`__@g' \
+				-e's@https://github.com/efabless/caravel/blob/master/openlane/@./@g' \
+				-e's@.. note::@**NOTE:**@g' \
+				-e's@.. warning::@**WARNING:**@g' \
+				> openlane/README.rst
+				
+venv/manifest.txt: ./requirements.txt
+	$(MAKE) check-python
+	rm -rf ./venv
+	$(PYTHON_BIN) -m venv ./venv
+	./venv/bin/python3 -m pip install --upgrade --no-cache-dir pip
+	./venv/bin/python3 -m pip install --upgrade --no-cache-dir -r requirements.txt
+	./venv/bin/python3 -m pip freeze > $@
 
-### OPEN_PDKS
-.PHONY: open-pdks
-open-pdks:
-	if [ -d "$(PDK_ROOT)/open_pdks" ]; then \
-		echo "Deleting existing $(PDK_ROOT)/open_pdks" && \
-		rm -rf $(PDK_ROOT)/open_pdks && sleep 2; \
-	fi
-	git clone git://opencircuitdesign.com/open_pdks $(PDK_ROOT)/open_pdks
-	cd $(PDK_ROOT)/open_pdks && \
-		git checkout master && git pull && \
-		git checkout -qf $(OPEN_PDKS_COMMIT)
-
-.PHONY: sky130
-sky130:
-	if [ -d "$(PDK_ROOT)/$(PDK)" ]; then \
-		echo "Deleting existing $(PDK_ROOT)/$(PDK)" && \
-		rm -rf $(PDK_ROOT)/$(PDK) && sleep 2;\
-	fi
-	docker run --rm\
-		-v $(PDK_ROOT):$(PDK_ROOT)\
-		-u $(shell id -u $(USER)):$(shell id -g $(USER)) \
-		-e PDK_ROOT=$(PDK_ROOT)\
-		-e GIT_COMMITTER_NAME="caravel"\
-		-e GIT_COMMITTER_EMAIL="caravel@caravel.caravel"\
-		efabless/openlane-tools:magic-$(PDK_MAGIC_COMMIT)-centos-7\
-		sh -c "\
-			cd $(PDK_ROOT)/open_pdks && \
-			./configure --enable-sky130-pdk=$(PDK_ROOT)/skywater-pdk --enable-sram-sky130 && \
-			make && \
-			make SHARED_PDKS_PATH=$(PDK_ROOT) install && \
-			make clean \
-		"
-.PHONY: gen-sources
-gen-sources:
-	touch $(PDK_ROOT)/$(PDK)/SOURCES
-	printf "skywater-pdk " >> $(PDK_ROOT)/$(PDK)/SOURCES
-	cd $(PDK_ROOT)/skywater-pdk && git rev-parse HEAD >> $(PDK_ROOT)/$(PDK)/SOURCES
-	printf "open_pdks " >> $(PDK_ROOT)/$(PDK)/SOURCES
-	cd $(PDK_ROOT)/open_pdks && git rev-parse HEAD >> $(PDK_ROOT)/$(PDK)/SOURCES
-	printf "magic $(PDK_MAGIC_COMMIT)" >> $(PDK_ROOT)/$(PDK)/SOURCES
-
+###########################################################################
+	
 .RECIPE: manifest
 manifest: mag/ maglef/ verilog/rtl/ Makefile
 	touch manifest && \
@@ -1397,26 +1354,14 @@ check-mcw:
 		echo "MCW Root: "$(MCW_ROOT)" doesn't exists, please export the correct path before running make. "; \
 		exit 1; \
 	fi
-
-# Make README.rst
-README.rst: README.src.rst docs/source/getting-started.rst docs/source/tool-versioning.rst openlane/README.src.rst docs/source/caravel-with-openlane.rst Makefile
-	pip -q install rst_include && \
-	rm -f README.rst && \
-		rst_include include README.src.rst - | \
-			sed \
-				-e's@\.\/\_static@\/docs\/source\/\_static@g' \
-				-e's@:doc:`tool-versioning`@`tool-versioning.rst <./docs/source/tool-versioning.rst>`__@g' \
-				-e's@.. note::@**NOTE:**@g' \
-				-e's@.. warning::@**WARNING:**@g' \
-				> README.rst && \
-		rst_include include openlane/README.src.rst - | \
-			sed \
-				-e's@https://github.com/efabless/caravel/blob/master/verilog@../verilog@g' \
-				-e's@:ref:`getting-started`@`README.rst <../README.rst>`__@g' \
-				-e's@https://github.com/efabless/caravel/blob/master/openlane/@./@g' \
-				-e's@.. note::@**NOTE:**@g' \
-				-e's@.. warning::@**WARNING:**@g' \
-				> openlane/README.rst
+	
+check-python:
+	@if ! command -v $(PYTHON_BIN) > /dev/null; then\
+		echo "Python 3 binary '$(PYTHON_BIN)' not found.";\
+		exit 1;\
+	fi
+	@$(PYTHON_BIN) -c "import sys; assert sys.version_info >= (3, 6), 'Python version less than 3.6'"
+	@echo "Python >=3.8 found."
 
 .PHONY: clean-openlane
 clean-openlane:
