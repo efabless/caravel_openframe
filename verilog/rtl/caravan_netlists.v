@@ -53,7 +53,7 @@
 	`include "gl/caravel_clocking.v"
 	`include "gl/user_id_programming.v"
 	`include "gl/chip_io_alt.v"
-	`include "gl/housekeeping.v"
+	`include "gl/housekeeping_alt.v"
 	`include "gl/mprj_logic_high.v"
 	`include "gl/mprj2_logic_high.v"
 	`include "gl/mgmt_protect.v"
@@ -81,7 +81,7 @@
 	`include "mprj_io.v"
 	`include "chip_io_alt.v"
 	`include "housekeeping_spi.v"
-	`include "housekeeping.v"
+	`include "housekeeping_alt.v"
 	`include "mprj_logic_high.v"
 	`include "mprj2_logic_high.v"
 	`include "mgmt_protect.v"
@@ -94,9 +94,19 @@
 	`include "xres_buf.v"
 	`include "spare_logic_block.v"
 	`include "mgmt_core_wrapper.v"
+	`include "buff_flash_clkrst.v"
+	`include "RAM128.v"
+	`include "RAM256.v"
+	`include "VexRiscv_MinDebugCache.v"
+	`include "mgmt_core.v"
 	`include "caravan.v"
     `endif
 
     `include "simple_por.v"
-
+	`include "caravan_core.v" 
+	`include "caravan_logo.v"
+	`include "caravan_motto.v" 
+	`include "copyright_block_a.v"
+	`include "open_source.v" 
+	`include "user_id_textblock.v"
 `endif
